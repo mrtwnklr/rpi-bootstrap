@@ -15,4 +15,4 @@ sd_device= # Set to the device shown by lsblk with the SD card plugged in
 ./rpi-bootstrap ${sd_device}
 ```
 
-Based on commands given at http://kmdouglass.github.io/posts/create-a-custom-raspbian-image-with-pi-gen-part-1/.
+Based on commands given at http://www.lpenz.org/articles/ansiblerpi/index.html.
