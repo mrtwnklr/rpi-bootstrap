@@ -1,0 +1,69 @@
+#!/bin/bash
+
+set -exuo pipefail
+
+# Source WPA_COUNTRY, WPA_SSID, WPA_PSK
+. config
+
+wpa_country=${WPA_COUNTRY}
+wpa_ssid=${WPA_SSID}
+# WPA_PSK should be the hash generated using `wpa_passphrase $WPA_SSID`
+wpa_psk=${WPA_PSK}
+
+# Must be passed as an argument; make sure it is the correct device
+# that the SD card you want to write the image to is shown as!
+# Example invokation on my laptop with the SD card shown as /dev/sda: `./rpi-bootstrap /dev/sda`
+sd_card=${1}
+
+rpi_release="2019-04-08-raspbian-stretch-lite"
+image="${rpi_release}.img"
+archive="${rpi_release}.zip"
+
+if ! [ -f "${image}" ]; then
+    echo "No raspbian image found, fetching..."
+    if ! [ -f "${archive}" ]; then
+        echo "No raspbian image archive found, downloading ${rpi_release}..."
+        curl -LO http://director.downloads.raspberrypi.org/raspbian_lite/images/raspbian_lite-2019-04-09/${rpi_release}.zip
+        archive_checksum="$(cat ${archive} | sha256sum | awk -F ' ' '{print $1}')"
+        # Checksum for 2019-04-08-raspbian-stretch-lite.zip noted at https://www.raspberrypi.org/downloads/raspbian/
+        checksum="03ec326d45c6eb6cef848cf9a1d6c7315a9410b49a276a6b28e67a40b11fdfcf"
+        if ! [ "${checksum}" = "${archive_checksum}" ]; then
+            echo "bad checksum - try again or update \$hash for newer release"
+            rm ${archive}
+            exit 1
+        fi
+    else
+        echo "Raspbian image archive found, skipping download and extracting..."
+    fi
+    unzip ${archive}
+fi
+
+# TODO: use guestfish which doesn't require sudo or loop devices
+sudo losetup -f ${image}
+loopdevice="$(sudo losetup -l | grep ${image} | awk -F ' ' '{print $1}')"
+rootfs="/dev/$(lsblk -lf ${loopdevice} | grep rootfs | awk -F ' ' '{print $1}')"
+
+tmpdir="/tmp/${image}.d"
+sudo mkdir ${tmpdir}
+sudo mount ${rootfs} ${tmpdir}
+# Enable ssh
+sudo ln -s /lib/systemd/system/ssh.service ${tmpdir}/etc/systemd/system/sshd.service
+sudo ln -s /lib/systemd/system/ssh.service ${tmpdir}/etc/systemd/system/multi-user.target.wants/ssh.service
+# Wireless config
+cat wpa_supplicant.conf <<EOF
+ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
+update_config=1
+country=${wpa_country}
+network={
+    ssid=${wpa_ssid}
+    psk=${wpa_psk}
+}
+EOF
+sudo cp wpa_supplicant.conf ${tmpdir}/etc/wpa_supplicant/wpa_supplicant.conf
+
+sudo umount ${tmpdir}
+sudo rmdir ${tmpdir}
+sudo losetup -d ${loopdevice}
+
+# TODO: split this into a separate stage
+sudo dd if=${image} of=${sd_card} bs=4M oflag=dsync status=progress
