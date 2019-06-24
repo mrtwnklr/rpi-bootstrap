@@ -9,6 +9,9 @@ wpa_country=${WPA_COUNTRY}
 wpa_ssid=${WPA_SSID}
 # WPA_PSK should be the hash generated using `wpa_passphrase $WPA_SSID`
 wpa_psk=${WPA_PSK}
+provisioner_url=${PROVISIONER_URL}
+provisioner_port=${PROVISIONER_PORT}
+authorization_token=${AUTHORIZATION_TOKEN}
 
 # Must be passed as an argument; make sure it is the correct device
 # that the SD card you want to write the image to is shown as!
@@ -60,6 +63,25 @@ network={
 }
 EOF
 sudo cp wpa_supplicant.conf ${tmpdir}/etc/wpa_supplicant/wpa_supplicant.conf
+# Checkin client
+cat rpi-provision-checkin.service <<EOF
+[Unit]
+Description=Check in to a rpi-provision server to request provisioning. Once provisioning is complete, this unit should be stopped and disabled by the server.
+Before=systemd-user-sessions.service
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Restart=always
+RestartSec=2
+RemainAfterExit=yes
+ExecStart=/usr/bin/curl --request POST --header "Content-Type: application/json" --data "{ \"ssh_port\": 22, \"ssh_user\": \"pi\" }" --url http://${provisioner_url}:${provisioner_port}/v0/checkin/
+
+[Install]
+WantedBy=multi-user.target
+EOF
+sudo cp rpi-provision-checkin.service ${tmpdir}/usr/lib/systemd/system/rpi-provision-checkin.service
+sudo ln -s /lib/systemd/system/rpi-provision-checkin.service ${tmpdir}/etc/systemd/system/multi-user.target.wants/rpi-provision-checkin.service
 
 sudo umount ${tmpdir}
 sudo rmdir ${tmpdir}
