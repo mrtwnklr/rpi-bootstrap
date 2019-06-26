@@ -81,11 +81,11 @@ ExecStart=/usr/bin/curl --request POST --header "Content-Type: application/json"
 [Install]
 WantedBy=multi-user.target
 EOF
-sudo cp rpi-provision-checkin.service ${tmpdir}/usr/lib/systemd/system/rpi-provision-checkin.service
+sudo cp $(pwd)/rpi-provision-checkin.service ${tmpdir}/lib/systemd/system/rpi-provision-checkin.service
 sudo ln -s /lib/systemd/system/rpi-provision-checkin.service ${tmpdir}/etc/systemd/system/multi-user.target.wants/rpi-provision-checkin.service
 # Provisioner pubkey
-mkdir -p ${tmpdir}/home/pi/.ssh
-echo ${provisioner_pubkey} >> ${tmpdir}/home/pi/.ssh/authorized_keys
+# sudo mkdir -p ${tmpdir}/home/pi/.ssh
+# echo ${provisioner_pubkey} >> ${tmpdir}/home/pi/.ssh/authorized_keys
 
 sudo umount ${tmpdir}
 sudo rmdir ${tmpdir}
