@@ -11,7 +11,8 @@ wpa_ssid=${WPA_SSID}
 wpa_psk=${WPA_PSK}
 provisioner_url=${PROVISIONER_URL}
 provisioner_port=${PROVISIONER_PORT}
-authorization_token=${AUTHORIZATION_TOKEN}
+provisioner_pubkey=${PROVISIONER_PUBKEY}
+# authorization_token=${AUTHORIZATION_TOKEN}
 
 # Must be passed as an argument; make sure it is the correct device
 # that the SD card you want to write the image to is shown as!
@@ -82,6 +83,9 @@ WantedBy=multi-user.target
 EOF
 sudo cp rpi-provision-checkin.service ${tmpdir}/usr/lib/systemd/system/rpi-provision-checkin.service
 sudo ln -s /lib/systemd/system/rpi-provision-checkin.service ${tmpdir}/etc/systemd/system/multi-user.target.wants/rpi-provision-checkin.service
+# Provisioner pubkey
+mkdir -p ${tmpdir}/home/pi/.ssh
+echo ${provisioner_pubkey} >> ${tmpdir}/home/pi/.ssh/authorized_keys
 
 sudo umount ${tmpdir}
 sudo rmdir ${tmpdir}
