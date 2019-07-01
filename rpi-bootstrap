@@ -56,24 +56,8 @@ sudo cp ${image} ${tmpimage}
 
 [ -f "${tmpimage}" ]
 
-# TODO: use guestfish which doesn't require sudo or loop devices
-sudo losetup -f ${tmpimage}
-# TODO: currently this sources all loop devices set up with this image. Should identify images uniquely so only performing on one.
-loopdevice="$(sudo losetup -l | grep ${tmpimage} | awk -F ' ' '{print $1}')"
-# Just try partx; if it fails assume a previous partition was already successful.
-# TODO: find a way to do this in partx idempotently.
-sudo partx -a ${loopdevice} || true
-# TODO: see if rootfs can be set by info from partx.
-rootfs="/dev/$(lsblk -lf ${loopdevice} | grep rootfs | awk -F ' ' '{print $1}')"
-
-mountdir="${tmpdir}/rpi-bootstrap-${tmpimage}.d"
-sudo mkdir -p ${mountdir}
-sudo mount ${rootfs} ${mountdir}
-# Enable ssh
-sudo ln -s /lib/systemd/system/ssh.service ${mountdir}/etc/systemd/system/sshd.service
-sudo ln -s /lib/systemd/system/ssh.service ${mountdir}/etc/systemd/system/multi-user.target.wants/ssh.service
-# Wireless config
-sudo cat <<EOF > ${workdir}/wpa_supplicant.conf
+# TODO: add files via generic filesystem config.
+rpi_wpa_supplicant=$(cat <<EOF
 ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
 update_config=1
 country=${wpa_country}
@@ -82,10 +66,8 @@ network={
     psk=${wpa_psk}
 }
 EOF
-sudo mv ${workdir}/wpa_supplicant.conf ${mountdir}/etc/wpa_supplicant/wpa_supplicant.conf
-# Checkin client
-# TODO: add via generic filesystem config.
-cat <<EOF > ${workdir}/rpi-provision-checkin.service
+    )
+rpi_provision_checkin=$(cat <<EOF
 [Unit]
 Description=Check in to a rpi-provision server to request provisioning. Once provisioning is complete, this unit should be stopped and disabled by the server.
 Before=systemd-user-sessions.service
@@ -101,16 +83,23 @@ ExecStart=/usr/bin/curl --request POST --header "Content-Type: application/json"
 [Install]
 WantedBy=multi-user.target
 EOF
-sudo mv ${workdir}/rpi-provision-checkin.service ${mountdir}/lib/systemd/system/rpi-provision-checkin.service
-sudo ln -s /lib/systemd/system/rpi-provision-checkin.service ${mountdir}/etc/systemd/system/multi-user.target.wants/rpi-provision-checkin.service
-# Provisioner pubkey
-sudo mkdir -p ${mountdir}/home/pi/.ssh
-echo ${provisioner_pubkey} >> ${workdir}/provisioner_pubkey
-sudo mv ${workdir}/provisioner_pubkey ${mountdir}/home/pi/.ssh/authorized_keys
+    )
 
-sudo umount ${mountdir}
-sudo rmdir ${mountdir}
-sudo losetup -d ${loopdevice}
+sudo guestfish --rw -i -a ${tmpimage} <<EOF
+list-filesystems
+ln-s /lib/systemd/system/ssh.service /etc/systemd/system/sshd.service
+ln-s /lib/systemd/system/ssh.service /etc/systemd/system/multi-user.target.wants/ssh.service
+upload -<<GF_EOF /etc/wpa_supplicant/wpa_supplicant.conf
+${rpi_wpa_supplicant}
+GF_EOF
+upload -<<GF_EOF /lib/systemd/system/rpi-provision-checkin.service
+${rpi_provision_checkin}
+GF_EOF
+ln-s /lib/systemd/system/rpi-provision-checkin.service /etc/systemd/system/multi-user.target.wants/rpi-provision-checkin.service
+mkdir-p /home/pi/.ssh
+write-append /home/pi/.ssh/authorized_keys "${provisioner_pubkey}"
+EOF
+
 out_image="${workdir}/${rpi_release}.out.img"
 sudo mv -f ${tmpimage} ${out_image}
 sudo rmdir ${tmpworkdir}
