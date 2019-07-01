@@ -66,33 +66,34 @@ ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
 update_config=1
 country=${wpa_country}
 network={
-    ssid=${wpa_ssid}
+    ssid="${wpa_ssid}"
     psk=${wpa_psk}
 }
 EOF
 sudo cp $(pwd)/wpa_supplicant.conf ${tmpdir}/etc/wpa_supplicant/wpa_supplicant.conf
 # Checkin client
-# cat <<EOF > $(pwd)/rpi-provision-checkin.service
-# [Unit]
-# Description=Check in to a rpi-provision server to request provisioning. Once provisioning is complete, this unit should be stopped and disabled by the server.
-# Before=systemd-user-sessions.service
-# Wants=network-online.target
-# After=network-online.target
+cat <<EOF > $(pwd)/rpi-provision-checkin.service
+[Unit]
+Description=Check in to a rpi-provision server to request provisioning. Once provisioning is complete, this unit should be stopped and disabled by the server.
+Before=systemd-user-sessions.service
+Wants=network-online.target
+After=network-online.target
 
-# [Service]
-# Restart=always
-# RestartSec=2
-# RemainAfterExit=yes
-# ExecStart=/usr/bin/curl --request POST --header "Content-Type: application/json" --data "{ \"ssh_port\": 22, \"ssh_user\": \"pi\" }" --url http://${provisioner_url}:${provisioner_port}/v0/checkin/
+[Service]
+Restart=always
+RestartSec=2
+RemainAfterExit=yes
+ExecStart=/usr/bin/curl --request POST --header "Content-Type: application/json" --data "{ \"ssh_port\": 22, \"ssh_user\": \"pi\" }" --url http://${provisioner_url}:${provisioner_port}/v0/checkin/
 
-# [Install]
-# WantedBy=multi-user.target
-# EOF
-# sudo cp $(pwd)/rpi-provision-checkin.service ${tmpdir}/lib/systemd/system/rpi-provision-checkin.service
-# sudo ln -s /lib/systemd/system/rpi-provision-checkin.service ${tmpdir}/etc/systemd/system/multi-user.target.wants/rpi-provision-checkin.service
+[Install]
+WantedBy=multi-user.target
+EOF
+sudo cp $(pwd)/rpi-provision-checkin.service ${tmpdir}/lib/systemd/system/rpi-provision-checkin.service
+sudo ln -s /lib/systemd/system/rpi-provision-checkin.service ${tmpdir}/etc/systemd/system/multi-user.target.wants/rpi-provision-checkin.service
 # Provisioner pubkey
-# sudo mkdir -p ${tmpdir}/home/pi/.ssh
-# echo ${provisioner_pubkey} >> ${tmpdir}/home/pi/.ssh/authorized_keys
+sudo mkdir -p ${tmpdir}/home/pi/.ssh
+echo ${provisioner_pubkey} >> provisioner_pubkey
+sudo cp $(pwd)/provisioner_pubkey ${tmpdir}/home/pi/.ssh/authorized_keys
 
 sudo umount ${tmpdir}
 sudo rmdir ${tmpdir}
