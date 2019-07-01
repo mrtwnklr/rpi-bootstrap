@@ -93,8 +93,8 @@ Wants=network-online.target
 After=network-online.target
 
 [Service]
-Restart=always
-RestartSec=2
+Restart=on-failure
+RestartSec=10s
 RemainAfterExit=yes
 ExecStart=/usr/bin/curl --request POST --header "Content-Type: application/json" --data "{ \"ssh_port\": 22, \"ssh_user\": \"pi\" }" --url http://${provisioner_url}:${provisioner_port}/v0/checkin/
 
