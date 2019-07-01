@@ -2,7 +2,6 @@
 
 set -exuo pipefail
 
-# Source WPA_COUNTRY, WPA_SSID, WPA_PSK
 . config
 
 wpa_country=${WPA_COUNTRY}
@@ -16,19 +15,24 @@ provisioner_pubkey=${PROVISIONER_PUBKEY}
 
 # Must be passed as an argument; make sure it is the correct device
 # that the SD card you want to write the image to is shown as!
-# Example invokation on my laptop with the SD card shown as /dev/sda: `./rpi-bootstrap /dev/sda`
+# Example invokation with the SD card shown by `lsblk` as `/dev/sda`: `./rpi-bootstrap /dev/sda`
 sd_card=${1}
 
 rpi_release="2019-04-08-raspbian-stretch-lite"
-image="${rpi_release}.img"
-archive="${rpi_release}.zip"
+curdir=$(pwd)
+tmpdir="/tmp"
+workdir="${curdir}/work"
+mkdir -p ${workdir}
+image="${workdir}/${rpi_release}.img"
+archive="${workdir}/${rpi_release}.zip"
 
-# TODO: download/unzip should be separate stages.
 if ! [ -f "${image}" ]; then
     echo "No raspbian image found, fetching..."
     if ! [ -f "${archive}" ]; then
         echo "No raspbian image archive found, downloading ${rpi_release}..."
+        pushd ${workdir}
         curl -LO http://director.downloads.raspberrypi.org/raspbian_lite/images/raspbian_lite-2019-04-09/${rpi_release}.zip
+        popd
         archive_checksum="$(cat ${archive} | sha256sum | awk -F ' ' '{print $1}')"
         # Checksum for 2019-04-08-raspbian-stretch-lite.zip noted at https://www.raspberrypi.org/downloads/raspbian/
         checksum="03ec326d45c6eb6cef848cf9a1d6c7315a9410b49a276a6b28e67a40b11fdfcf"
@@ -40,28 +44,36 @@ if ! [ -f "${image}" ]; then
     else
         echo "Raspbian image archive found, skipping download and extracting..."
     fi
-    unzip ${archive}
+    unzip ${archive} -d ${workdir}/
 fi
 
+[ -f "${image}" ]
+
+tmpworkdir="${tmpdir}/rpi-bootstrap-work"
+sudo mkdir -p ${tmpworkdir}
+tmpimage="${tmpworkdir}/${rpi_release}.img"
+sudo cp ${image} ${tmpimage}
+
+[ -f "${tmpimage}" ]
+
 # TODO: use guestfish which doesn't require sudo or loop devices
-sudo losetup -f ${image}
-# TODO: currently this sources all loop devices set up with this $image. Should identify images uniquely so only performing on one.
-loopdevice="$(sudo losetup -l | grep ${image} | awk -F ' ' '{print $1}')"
+sudo losetup -f ${tmpimage}
+# TODO: currently this sources all loop devices set up with this image. Should identify images uniquely so only performing on one.
+loopdevice="$(sudo losetup -l | grep ${tmpimage} | awk -F ' ' '{print $1}')"
 # Just try partx; if it fails assume a previous partition was already successful.
 # TODO: find a way to do this in partx idempotently.
 sudo partx -a ${loopdevice} || true
 # TODO: see if rootfs can be set by info from partx.
 rootfs="/dev/$(lsblk -lf ${loopdevice} | grep rootfs | awk -F ' ' '{print $1}')"
 
-tmpdir="/tmp/${image}.d"
-sudo mkdir ${tmpdir}
-sudo mount ${rootfs} ${tmpdir}
+mountdir="${tmpdir}/rpi-bootstrap-${tmpimage}.d"
+sudo mkdir -p ${mountdir}
+sudo mount ${rootfs} ${mountdir}
 # Enable ssh
-sudo ln -s /lib/systemd/system/ssh.service ${tmpdir}/etc/systemd/system/sshd.service
-sudo ln -s /lib/systemd/system/ssh.service ${tmpdir}/etc/systemd/system/multi-user.target.wants/ssh.service
+sudo ln -s /lib/systemd/system/ssh.service ${mountdir}/etc/systemd/system/sshd.service
+sudo ln -s /lib/systemd/system/ssh.service ${mountdir}/etc/systemd/system/multi-user.target.wants/ssh.service
 # Wireless config
-# TODO: write this to a tmp directory
-cat <<EOF > $(pwd)/wpa_supplicant.conf
+sudo cat <<EOF > ${workdir}/wpa_supplicant.conf
 ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
 update_config=1
 country=${wpa_country}
@@ -70,9 +82,10 @@ network={
     psk=${wpa_psk}
 }
 EOF
-sudo cp $(pwd)/wpa_supplicant.conf ${tmpdir}/etc/wpa_supplicant/wpa_supplicant.conf
+sudo mv ${workdir}/wpa_supplicant.conf ${mountdir}/etc/wpa_supplicant/wpa_supplicant.conf
 # Checkin client
-cat <<EOF > $(pwd)/rpi-provision-checkin.service
+# TODO: add via generic filesystem config.
+cat <<EOF > ${workdir}/rpi-provision-checkin.service
 [Unit]
 Description=Check in to a rpi-provision server to request provisioning. Once provisioning is complete, this unit should be stopped and disabled by the server.
 Before=systemd-user-sessions.service
@@ -88,18 +101,20 @@ ExecStart=/usr/bin/curl --request POST --header "Content-Type: application/json"
 [Install]
 WantedBy=multi-user.target
 EOF
-sudo cp $(pwd)/rpi-provision-checkin.service ${tmpdir}/lib/systemd/system/rpi-provision-checkin.service
-sudo ln -s /lib/systemd/system/rpi-provision-checkin.service ${tmpdir}/etc/systemd/system/multi-user.target.wants/rpi-provision-checkin.service
+sudo mv ${workdir}/rpi-provision-checkin.service ${mountdir}/lib/systemd/system/rpi-provision-checkin.service
+sudo ln -s /lib/systemd/system/rpi-provision-checkin.service ${mountdir}/etc/systemd/system/multi-user.target.wants/rpi-provision-checkin.service
 # Provisioner pubkey
-sudo mkdir -p ${tmpdir}/home/pi/.ssh
-echo ${provisioner_pubkey} >> provisioner_pubkey
-sudo cp $(pwd)/provisioner_pubkey ${tmpdir}/home/pi/.ssh/authorized_keys
+sudo mkdir -p ${mountdir}/home/pi/.ssh
+echo ${provisioner_pubkey} >> ${workdir}/provisioner_pubkey
+sudo mv ${workdir}/provisioner_pubkey ${mountdir}/home/pi/.ssh/authorized_keys
 
-sudo umount ${tmpdir}
-sudo rmdir ${tmpdir}
+sudo umount ${mountdir}
+sudo rmdir ${mountdir}
 sudo losetup -d ${loopdevice}
+out_image="${workdir}/${rpi_release}.out.img"
+sudo mv -f ${tmpimage} ${out_image}
+sudo rmdir ${tmpworkdir}
 
 # TODO: split this into a separate stage
-sudo dd if=${image} of=${sd_card} bs=4M oflag=dsync status=progress
+sudo dd if=${out_image} of=${sd_card} bs=4M oflag=dsync status=progress
 sync
-mv -f ${image} ${image}.old
