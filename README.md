@@ -2,7 +2,7 @@
 
 Minimal configuration utility for Raspberry Pi first time setup, by overlaying files into the rootfs of a raw OS image.
 
-Does not require building a new Raspbian image, which can 20-30 minutes depending on the hardware and network (using [pi-gen](https://github.com/Rpi-Distro/pi-gen)).
+Does not require building a new Raspbian image, which can take 20-30 minutes depending on the hardware and network (using [pi-gen](https://github.com/Rpi-Distro/pi-gen) to build a minimal stage 2 image).
 
 Currently tested running `rpi-bootstrap` on a Fedora 30 host, to modify a Raspbian lite image.
 
