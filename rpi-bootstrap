@@ -61,6 +61,7 @@ rpi_wpa_supplicant=$(cat <<EOF
 ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
 update_config=1
 country=${wpa_country}
+
 network={
     ssid="${wpa_ssid}"
     psk=${wpa_psk}
@@ -84,6 +85,21 @@ ExecStart=/usr/bin/curl --request POST --header "Content-Type: application/json"
 WantedBy=multi-user.target
 EOF
     )
+rpi_enable_wifi=$(cat <<EOF
+[Unit]
+Description=Unblocks wifi by setting the country information. Disables itself after first run.
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/raspi-config nonint do_wifi_country ${wpa_country}
+ExecStart=rm /etc/systemd/system/multi-user.target.wants/rpi-enable-wifi.service
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    )
 
 # workaround when VirtualBox is running, see https://bugzilla.redhat.com/show_bug.cgi?id=1277744
 LIBGUESTFS_BACKEND_SETTINGS=
@@ -95,13 +111,21 @@ sudo LIBGUESTFS_BACKEND_SETTINGS=${LIBGUESTFS_BACKEND_SETTINGS} guestfish --rw -
 list-filesystems
 ln-s /lib/systemd/system/ssh.service /etc/systemd/system/sshd.service
 ln-s /lib/systemd/system/ssh.service /etc/systemd/system/multi-user.target.wants/ssh.service
+
 upload -<<GF_EOF /etc/wpa_supplicant/wpa_supplicant.conf
 ${rpi_wpa_supplicant}
 GF_EOF
+
 upload -<<GF_EOF /lib/systemd/system/rpi-provision-checkin.service
 ${rpi_provision_checkin}
 GF_EOF
 ln-s /lib/systemd/system/rpi-provision-checkin.service /etc/systemd/system/multi-user.target.wants/rpi-provision-checkin.service
+
+upload -<<GF_EOF /lib/systemd/system/rpi-enable-wifi.service
+${rpi_enable_wifi}
+GF_EOF
+ln-s /lib/systemd/system/rpi-enable-wifi.service /etc/systemd/system/multi-user.target.wants/rpi-enable-wifi.service
+
 mkdir-p /home/pi/.ssh
 write-append /home/pi/.ssh/authorized_keys "${provisioner_pubkey}"
 EOF
