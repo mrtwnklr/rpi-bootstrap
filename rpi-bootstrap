@@ -18,9 +18,11 @@ provisioner_pubkey=${PROVISIONER_PUBKEY}
 # Example invokation with the SD card shown by `lsblk` as `/dev/sda`: `./rpi-bootstrap /dev/sda`
 sd_card=${1:-}
 
-rpi_release="2019-04-08-raspbian-stretch-lite"
+rpi_release=$(basename -s .zip ${RPI_RELEASE_URL})
+rpi_release_url=${RPI_RELEASE_URL}
+checksum=${RPI_RELEASE_CHECKSUM}
 curdir=$(pwd)
-tmpdir="/tmp"
+tmpdir=${TMP_DIR:- "/tmp"}
 workdir="${curdir}/work"
 mkdir -p ${workdir}
 image="${workdir}/${rpi_release}.img"
@@ -31,11 +33,9 @@ if ! [ -f "${image}" ]; then
     if ! [ -f "${archive}" ]; then
         echo "No raspbian image archive found, downloading ${rpi_release}..."
         pushd ${workdir}
-        curl -LO http://director.downloads.raspberrypi.org/raspbian_lite/images/raspbian_lite-2019-04-09/${rpi_release}.zip
+        curl -LO ${rpi_release_url}
         popd
         archive_checksum="$(cat ${archive} | sha256sum | awk -F ' ' '{print $1}')"
-        # Checksum for 2019-04-08-raspbian-stretch-lite.zip noted at https://www.raspberrypi.org/downloads/raspbian/
-        checksum="03ec326d45c6eb6cef848cf9a1d6c7315a9410b49a276a6b28e67a40b11fdfcf"
         if ! [ "${checksum}" = "${archive_checksum}" ]; then
             echo "bad checksum - try again or update \$hash for newer release"
             rm ${archive}

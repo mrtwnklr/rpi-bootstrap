@@ -4,3 +4,6 @@ WPA_PSK=
 PROVISIONER_URL=
 PROVISIONER_PORT=
 PROVISIONER_PUBKEY=
+RPI_RELEASE_URL=http://director.downloads.raspberrypi.org/raspbian_lite/images/raspbian_lite-2019-04-09/2019-04-08-raspbian-stretch-lite.zip
+RPI_RELEASE_CHECKSUM=03ec326d45c6eb6cef848cf9a1d6c7315a9410b49a276a6b28e67a40b11fdfcf
+TMP_DIR=/dev/shm
