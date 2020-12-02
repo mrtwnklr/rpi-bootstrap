@@ -16,7 +16,7 @@ provisioner_pubkey=${PROVISIONER_PUBKEY}
 # Must be passed as an argument; make sure it is the correct device
 # that the SD card you want to write the image to is shown as!
 # Example invokation with the SD card shown by `lsblk` as `/dev/sda`: `./rpi-bootstrap /dev/sda`
-sd_card=${1}
+sd_card=${1:-}
 
 rpi_release="2019-04-08-raspbian-stretch-lite"
 curdir=$(pwd)
@@ -108,8 +108,13 @@ EOF
 
 out_image="${workdir}/${rpi_release}.out.img"
 sudo mv -f ${tmpimage} ${out_image}
+sudo chown $USER:$USER ${out_image}
 sudo rmdir ${tmpworkdir}
 
 # TODO: split this into a separate stage
-sudo dd if=${out_image} of=${sd_card} bs=4M oflag=dsync status=progress
-sync
+if [ "${sd_card}" ]; then
+    sudo dd if=${out_image} of=${sd_card} bs=4M oflag=dsync status=progress
+    sync
+else
+    echo Image is not written
+fi
