@@ -85,7 +85,13 @@ WantedBy=multi-user.target
 EOF
     )
 
-sudo guestfish --rw -i -a ${tmpimage} <<EOF
+# workaround when VirtualBox is running, see https://bugzilla.redhat.com/show_bug.cgi?id=1277744
+LIBGUESTFS_BACKEND_SETTINGS=
+if pgrep -f '/virtualbox/V.*--startvm\>'; then
+    LIBGUESTFS_BACKEND_SETTINGS='force_tcg'
+fi
+
+sudo LIBGUESTFS_BACKEND_SETTINGS=${LIBGUESTFS_BACKEND_SETTINGS} guestfish --rw -i -a ${tmpimage} <<EOF
 list-filesystems
 ln-s /lib/systemd/system/ssh.service /etc/systemd/system/sshd.service
 ln-s /lib/systemd/system/ssh.service /etc/systemd/system/multi-user.target.wants/ssh.service
