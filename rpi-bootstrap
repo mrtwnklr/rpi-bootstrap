@@ -120,10 +120,14 @@ upload -<<GF_EOF /lib/systemd/system/rpi-enable-wifi.service
 ${rpi_enable_wifi}
 GF_EOF
 ln-s /lib/systemd/system/rpi-enable-wifi.service /etc/systemd/system/multi-user.target.wants/rpi-enable-wifi.service
+EOF
 
+if [ "${provisioner_pubkey}" ]; then
+    cat <<EOF | sudo tee -a ${tmp_image_fs_commands}
 mkdir-p /home/pi/.ssh
 write-append /home/pi/.ssh/authorized_keys "${provisioner_pubkey}"
 EOF
+fi
 
 # workaround when VirtualBox is running, see https://bugzilla.redhat.com/show_bug.cgi?id=1277744
 LIBGUESTFS_BACKEND_SETTINGS=
