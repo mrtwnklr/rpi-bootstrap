@@ -101,17 +101,12 @@ WantedBy=multi-user.target
 EOF
     )
 
-# workaround when VirtualBox is running, see https://bugzilla.redhat.com/show_bug.cgi?id=1277744
-LIBGUESTFS_BACKEND_SETTINGS=
-if pgrep -f '/virtualbox/V.*--startvm\>'; then
-    LIBGUESTFS_BACKEND_SETTINGS='force_tcg'
-fi
+tmp_image_fs_commands="${tmpworkdir}/${rpi_release}.out.img.fs_commands"
 
-sudo LIBGUESTFS_BACKEND_SETTINGS=${LIBGUESTFS_BACKEND_SETTINGS} guestfish --rw -i -a ${tmpimage} <<EOF
+cat <<EOF | sudo tee ${tmp_image_fs_commands}
 list-filesystems
 ln-s /lib/systemd/system/ssh.service /etc/systemd/system/sshd.service
 ln-s /lib/systemd/system/ssh.service /etc/systemd/system/multi-user.target.wants/ssh.service
-
 upload -<<GF_EOF /etc/wpa_supplicant/wpa_supplicant.conf
 ${rpi_wpa_supplicant}
 GF_EOF
@@ -130,8 +125,17 @@ mkdir-p /home/pi/.ssh
 write-append /home/pi/.ssh/authorized_keys "${provisioner_pubkey}"
 EOF
 
+# workaround when VirtualBox is running, see https://bugzilla.redhat.com/show_bug.cgi?id=1277744
+LIBGUESTFS_BACKEND_SETTINGS=
+if pgrep -f '/virtualbox/V.*--startvm\>'; then
+    LIBGUESTFS_BACKEND_SETTINGS='force_tcg'
+fi
+
+sudo LIBGUESTFS_BACKEND_SETTINGS=${LIBGUESTFS_BACKEND_SETTINGS} guestfish --rw -i -a ${tmpimage} --file ${tmp_image_fs_commands}
+
 out_image="${workdir}/${rpi_release}.out.img"
 sudo mv -f ${tmpimage} ${out_image}
+sudo rm -f ${tmp_image_fs_commands}
 sudo chown $USER:$USER ${out_image}
 sudo rmdir ${tmpworkdir}
 
