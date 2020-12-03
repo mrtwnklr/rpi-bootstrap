@@ -111,16 +111,20 @@ upload -<<GF_EOF /etc/wpa_supplicant/wpa_supplicant.conf
 ${rpi_wpa_supplicant}
 GF_EOF
 
-upload -<<GF_EOF /lib/systemd/system/rpi-provision-checkin.service
-${rpi_provision_checkin}
-GF_EOF
-ln-s /lib/systemd/system/rpi-provision-checkin.service /etc/systemd/system/multi-user.target.wants/rpi-provision-checkin.service
-
 upload -<<GF_EOF /lib/systemd/system/rpi-enable-wifi.service
 ${rpi_enable_wifi}
 GF_EOF
 ln-s /lib/systemd/system/rpi-enable-wifi.service /etc/systemd/system/multi-user.target.wants/rpi-enable-wifi.service
 EOF
+
+if [ "${provisioner_url}" ]; then
+    cat <<EOF | sudo tee -a ${tmp_image_fs_commands}
+upload -<<GF_EOF /lib/systemd/system/rpi-provision-checkin.service
+${rpi_provision_checkin}
+GF_EOF
+ln-s /lib/systemd/system/rpi-provision-checkin.service /etc/systemd/system/multi-user.target.wants/rpi-provision-checkin.service
+EOF
+fi
 
 if [ "${provisioner_pubkey}" ]; then
     cat <<EOF | sudo tee -a ${tmp_image_fs_commands}
