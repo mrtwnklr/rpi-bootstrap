@@ -107,6 +107,10 @@ cat <<EOF | sudo tee ${tmp_image_fs_commands}
 list-filesystems
 ln-s /lib/systemd/system/ssh.service /etc/systemd/system/sshd.service
 ln-s /lib/systemd/system/ssh.service /etc/systemd/system/multi-user.target.wants/ssh.service
+EOF
+
+if [ "${wpa_ssid}" ]; then
+    cat <<EOF | sudo tee -a ${tmp_image_fs_commands}
 upload -<<GF_EOF /etc/wpa_supplicant/wpa_supplicant.conf
 ${rpi_wpa_supplicant}
 GF_EOF
@@ -116,6 +120,7 @@ ${rpi_enable_wifi}
 GF_EOF
 ln-s /lib/systemd/system/rpi-enable-wifi.service /etc/systemd/system/multi-user.target.wants/rpi-enable-wifi.service
 EOF
+fi
 
 if [ "${provisioner_url}" ]; then
     cat <<EOF | sudo tee -a ${tmp_image_fs_commands}
