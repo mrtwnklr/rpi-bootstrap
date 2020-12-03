@@ -135,6 +135,10 @@ if [ "${provisioner_pubkey}" ]; then
     cat <<EOF | sudo tee -a ${tmp_image_fs_commands}
 mkdir-p /home/pi/.ssh
 write-append /home/pi/.ssh/authorized_keys "${provisioner_pubkey}"
+
+aug-init / 0
+aug-set /files/etc/ssh/sshd_config/PasswordAuthentication no
+aug-save
 EOF
 fi
 
