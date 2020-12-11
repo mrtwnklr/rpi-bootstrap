@@ -11,6 +11,7 @@ wpa_psk=${WPA_PSK}
 provisioner_url=${PROVISIONER_URL}
 provisioner_port=${PROVISIONER_PORT}
 provisioner_pubkey=${PROVISIONER_PUBKEY}
+gpu_mem=${GPU_MEM}
 # authorization_token=${AUTHORIZATION_TOKEN}
 
 # Must be passed as an argument; make sure it is the correct device
@@ -139,6 +140,12 @@ write-append /home/pi/.ssh/authorized_keys "${provisioner_pubkey}"
 aug-init / 0
 aug-set /files/etc/ssh/sshd_config/PasswordAuthentication no
 aug-save
+EOF
+fi
+
+if [ "${gpu_mem}" ]; then
+    cat <<EOF | sudo tee -a ${tmp_image_fs_commands}
+write-append /boot/config.txt "gpu_mem=${gpu_mem}"
 EOF
 fi
 
