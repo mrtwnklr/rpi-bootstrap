@@ -95,7 +95,7 @@ After=network-online.target
 [Service]
 Type=oneshot
 ExecStart=/usr/bin/raspi-config nonint do_wifi_country ${wpa_country}
-ExecStart=rm /etc/systemd/system/multi-user.target.wants/rpi-enable-wifi.service
+ExecStart=/bin/rm /etc/systemd/system/multi-user.target.wants/rpi-enable-wifi.service
 
 [Install]
 WantedBy=multi-user.target
